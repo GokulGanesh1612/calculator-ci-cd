@@ -17,30 +17,15 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Creating Python virtual environment'
-
-                bat '''
-                    if exist venv rmdir /s /q venv
-
-                    where py >nul 2>&1
-                    if %ERRORLEVEL% EQU 0 (
-                        py -3 -m venv venv
-                    ) else (
-                        python -m venv venv
-                    )
-
-                    venv\\Scripts\\python.exe -m pip install --upgrade pip
-                    venv\\Scripts\\python.exe -m pip install -r requirements.txt
-                '''
+                sh 'python3 -m venv venv'
+                sh '. venv/bin/activate && pip install --upgrade pip'
+                sh '. venv/bin/activate && pip install -r requirements.txt'
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running Python unit tests'
-
-                bat '''
-                    venv\\Scripts\\python.exe -m pytest -v --junitxml=test-results.xml
-                '''
+                sh '. venv/bin/activate && pytest'
             }
         }
 
