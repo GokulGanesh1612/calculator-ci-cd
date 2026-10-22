@@ -1,219 +1,75 @@
 pipeline {
-
-    agent any
-
-
+    agent {
+        label 'windows'
+    }
 
     options {
-
         timestamps()
-
         disableConcurrentBuilds()
-
     }
-
-
 
     stages {
+        stage('Clean Workspace') {
+            steps {
+                deleteDir()
+            }
+        }
 
         stage('Checkout') {
-
             steps {
-
-                echo 'Checking out source code from GitHub'
-
                 checkout scm
-
             }
-
         }
 
-
-
-        stage('Build') {
-
+        stage('Set Up Python Environment') {
             steps {
-
-                echo 'Creating Python virtual environment'
-
-
-
                 bat '''
-
-                    if exist venv rmdir /s /q venv
-
-
-
-                    where py >nul 2>&1
-
-                    if %ERRORLEVEL% EQU 0 (
-
-                        py -3 -m venv venv
-
-                    ) else (
-
-                        python -m venv venv
-
-                    )
-
-
-
-                    venv\\Scripts\\python.exe -m pip install --upgrade pip
-
-                    venv\\Scripts\\python.exe -m pip install -r requirements.txt
-
+                    py -3 --version
+                    py -3 -m venv .venv
+                    .venv\\Scripts\\python.exe -m pip install --upgrade pip
                 '''
-
             }
-
         }
 
-
-
-        stage('Test') {
-
+        stage('Install Dependencies') {
             steps {
-
-                echo 'Running Python unit tests'
-
-
-
                 bat '''
-
-                    venv\\Scripts\\python.exe -m pytest -v --junitxml=test-results.xml
-
+                    .venv\\Scripts\\python.exe -m pip install -r requirements.txt
+                    .venv\\Scripts\\python.exe -m pip install pytest
                 '''
-
             }
-
         }
 
-
-
-        stage('Package') {
-
+        stage('Run Tests') {
             steps {
-
-                echo 'Creating application package'
-
-
-
-                powershell '''
-
-                    New-Item -ItemType Directory -Force -Path dist | Out-Null
-
-
-
-                    $packageName = "dist/calculator-$env:BUILD_NUMBER.zip"
-
-
-
-                    Compress-Archive `
-
-                        -Path calculator.py, requirements.txt `
-
-                        -DestinationPath $packageName `
-
-                        -Force
-
-
-
-                    Write-Host "Created package: $packageName"
-
+                bat '''
+                    .venv\\Scripts\\python.exe -m pytest ^
+                        --junitxml=test-results.xml ^
+                        -v
                 '''
-
             }
-
         }
-
-
-
-        stage('Deploy') {
-
-            steps {
-
-                echo 'Deploying application package'
-
-
-
-                powershell '''
-
-                    New-Item -ItemType Directory -Force -Path deployed | Out-Null
-
-
-
-                    $packageName = "dist/calculator-$env:BUILD_NUMBER.zip"
-
-
-
-                    Copy-Item `
-
-                        -Path $packageName `
-
-                        -Destination deployed `
-
-                        -Force
-
-
-
-                    Write-Host "Deployment completed."
-
-                '''
-
-            }
-
-        }
-
     }
-
-
 
     post {
-
         always {
-
-            echo 'Archiving test results and build artifacts'
-
-
-
             junit(
-
                 testResults: 'test-results.xml',
-
                 allowEmptyResults: true
-
             )
-
-
 
             archiveArtifacts(
-
-                artifacts: 'dist/*.zip',
-
-                fingerprint: true,
-
+                artifacts: 'test-results.xml',
                 allowEmptyArchive: true
-
             )
-
         }
-
-
 
         success {
-
-            echo 'Build, tests, packaging, and deployment completed successfully.'
-
+            echo 'All tests passed successfully.'
         }
-
-
 
         failure {
-
-            echo 'Pipeline failed. Review the console output for details.'
-
+            echo 'The build or tests failed. Check the console output.'
         }
-
     }
-
 }
